@@ -385,7 +385,9 @@ typedef struct wlc_ssid {
 
 typedef struct wlc_ssid_ext {
 	bool       hidden;
-	uint32		SSID_len;
+	uint16     flags;
+	uint8	   SSID_len;
+	int8	   rssi_thresh;
 	uchar		SSID[DOT11_MAX_SSID_LEN];
 } wlc_ssid_ext_t;
 
@@ -646,6 +648,62 @@ typedef struct wl_join_params {
 					 * of the wl_assoc_params_t struct when it does present.
 					 */
 } wl_join_params_t;
+
+typedef struct wlc_roam_exp_params {
+	int8 a_band_boost_threshold;
+	int8 a_band_penalty_threshold;
+	uint8 a_band_boost_factor;
+	uint8 a_band_penalty_factor;
+	uint8 cur_bssid_boost;
+	int8 alert_roam_trigger_threshold;
+	uint16 a_band_max_boost;
+} wlc_roam_exp_params_t;
+
+#define ROAM_EXP_CFG_VERSION     1
+#define ROAM_EXP_ENABLE_FLAG             (1 << 0)
+#define ROAM_EXP_CFG_PRESENT             (1 << 1)
+typedef struct wl_roam_exp_cfg {
+	uint8 version;
+	uint8 flags;
+	uint16 reserved;
+	wlc_roam_exp_params_t params;
+} wl_roam_exp_cfg_t;
+
+typedef struct wl_bssid_pref_list {
+	struct ether_addr bssid;
+	/* Add this to modify rssi */
+	int8 rssi_factor;
+	int8 flags;
+} wl_bssid_pref_list_t;
+
+#define BSSID_PREF_LIST_VERSION        1
+#define ROAM_EXP_CLEAR_BSSID_PREF        (1 << 0)
+typedef struct wl_bssid_pref_cfg {
+	uint8 version;
+	uint8 flags;
+	uint16 count;
+	wl_bssid_pref_list_t bssids[1];
+} wl_bssid_pref_cfg_t;
+
+#define SSID_WHITELIST_VERSION         1
+#define ROAM_EXP_CLEAR_SSID_WHITELIST    (1 << 0)
+/* Roam SSID whitelist, ssids in this list are ok to                   */
+/* be considered as targets to join when considering a roam */
+typedef struct wl_ssid_whitelist {
+	uint8 version;
+	uint8 flags;
+	uint8 ssid_count;
+	uint8 reserved;
+	wlc_ssid_t ssids[1];
+} wl_ssid_whitelist_t;
+
+#define ROAM_EXP_EVENT_VERSION       1
+typedef struct wl_roam_exp_event {
+	uint8 version;
+	uint8 flags;
+	uint16 reserved;
+	wlc_ssid_t cur_ssid;
+} wl_roam_exp_event_t;
 
 #define WL_JOIN_PARAMS_FIXED_SIZE 	(OFFSETOF(wl_join_params_t, params) + \
 					 WL_ASSOC_PARAMS_FIXED_SIZE)
@@ -2544,6 +2602,9 @@ enum {
 #define PFN_SWC_MAX_NUM_APS       16
 #define PFN_HOTLIST_MAX_NUM_APS   64
 
+#define MAX_EPNO_HIDDEN_SSID         8
+#define MAX_WHITELIST_SSID           2
+
 /* PFN network info structure */
 typedef struct wl_pfn_subnet_info {
 	struct ether_addr BSSID;
@@ -2695,7 +2756,8 @@ typedef struct wl_pfn_gscan_cfg {
 
 #define WL_PFN_CFG_FLAGS_PROHIBITED	0x00000001	/* Accept and use prohibited channels */
 #define WL_PFN_CFG_FLAGS_RESERVED	0xfffffffe	/* Remaining reserved for future use */
-
+#define WL_PFN_SSID_A_BAND_TRIG   0x20
+#define WL_PFN_SSID_BG_BAND_TRIG   0x40
 typedef struct wl_pfn {
 	wlc_ssid_t		ssid;			/* ssid name and its length */
 	int32			flags;			/* bit2: hidden */
@@ -2711,6 +2773,44 @@ typedef struct wl_pfn_list {
 	uint32		count;
 	wl_pfn_t	pfn[1];
 } wl_pfn_list_t;
+
+#define PFN_SSID_EXT_VERSION   1
+
+typedef struct wl_pfn_ext {
+	uint8 flags;
+	int8 rssi_thresh; /* RSSI threshold, track only if RSSI > threshold */
+	uint16 wpa_auth; /* Match the wpa auth type defined in wlioctl_defs.h */
+	uint8 ssid[DOT11_MAX_SSID_LEN];
+	uint8 ssid_len;
+	uint8 pad;
+} wl_pfn_ext_t;
+
+typedef struct wl_pfn_ext_list {
+	uint16 version;
+	uint16 count;
+	wl_pfn_ext_t pfn_ext[1];
+} wl_pfn_ext_list_t;
+
+#define WL_PFN_SSID_EXT_FOUND   0x1
+#define WL_PFN_SSID_EXT_LOST    0x2
+typedef struct wl_pfn_result_ssid {
+	uint8 flags;
+	int8 rssi;
+	/* channel number */
+	uint16 channel;
+	/* Assume idx in order of cfg */
+	uint32 index;
+} wl_pfn_result_ssid_crc32_t;
+
+typedef struct wl_pfn_ssid_ext_result {
+	uint16 version;
+	uint16 count;
+	wl_pfn_result_ssid_crc32_t net[1];
+} wl_pfn_ssid_ext_result_t;
+
+#define PFN_EXT_AUTH_CODE_OPEN   1 /* open */
+#define PFN_EXT_AUTH_CODE_PSK   2 /* WPA_PSK or WPA2PSK */
+#define PFN_EXT_AUTH_CODE_EAPOL 4 /* any EAPOL  */
 
 #define WL_PFN_MAC_OUI_ONLY_MASK      1
 #define WL_PFN_SET_MAC_UNASSOC_MASK   2
