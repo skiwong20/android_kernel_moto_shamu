@@ -413,6 +413,9 @@ typedef struct dhd_pub {
 #if defined(WLTDLS) && defined(PCIE_FULL_DONGLE)
 	tdls_peer_tbl_t peer_tbl;
 #endif
+#ifdef GSCAN_SUPPORT
+	bool lazy_roam_enable;
+#endif /* GSCAN_SUPPORT */
 } dhd_pub_t;
 
 #if defined(BCMWDF)
@@ -628,12 +631,26 @@ extern void dhd_txcomplete(dhd_pub_t *dhdp, void *txp, bool success);
 #define WIFI_FEATURE_TDLS_OFFCHANNEL    0x2000      /* Support for TDLS off channel     */
 #define WIFI_FEATURE_EPR                0x4000      /* Enhanced power reporting         */
 #define WIFI_FEATURE_AP_STA             0x8000      /* Support for AP STA Concurrency   */
+#define WIFI_FEATURE_LINKSTAT           0x10000     /* Support for Linkstats            */
+#define WIFI_FEATURE_HAL_EPNO           0x40000     /* WiFi PNO enhanced                */
 
 #define MAX_FEATURE_SET_CONCURRRENT_GROUPS  3
 
 extern int dhd_dev_get_feature_set(struct net_device *dev);
 extern int *dhd_dev_get_feature_set_matrix(struct net_device *dev, int *num);
 extern int dhd_dev_set_nodfs(struct net_device *dev, u32 nodfs);
+
+#ifdef GSCAN_SUPPORT
+extern int dhd_dev_set_lazy_roam_cfg(struct net_device *dev,
+             wlc_roam_exp_params_t *roam_param);
+extern int dhd_dev_lazy_roam_enable(struct net_device *dev, uint32 enable);
+extern int dhd_dev_set_lazy_roam_bssid_pref(struct net_device *dev,
+       wl_bssid_pref_cfg_t *bssid_pref, uint32 flush);
+extern int dhd_dev_set_blacklist_bssid(struct net_device *dev, maclist_t *blacklist,
+    uint32 len, uint32 flush);
+extern int dhd_dev_set_whitelist_ssid(struct net_device *dev, wl_ssid_whitelist_t *whitelist,
+    uint32 len, uint32 flush);
+#endif /* GSCAN_SUPPORT */
 
 /* OS independent layer functions */
 extern int dhd_os_proto_block(dhd_pub_t * pub);
@@ -702,7 +719,7 @@ extern int net_os_enable_packet_filter(struct net_device *dev, int val);
 extern int net_os_rxfilter_add_remove(struct net_device *dev, int val, int num);
 #endif /* PKT_FILTER_SUPPORT */
 
-extern int dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd);
+extern int dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd, int *dtim_period, int *bcn_interval);
 extern bool dhd_support_sta_mode(dhd_pub_t *dhd);
 
 #ifdef DHD_DEBUG
@@ -931,6 +948,10 @@ extern uint dhd_force_tx_queueing;
 #define CUSTOM_SUSPEND_BCN_LI_DTIM		DEFAULT_SUSPEND_BCN_LI_DTIM
 #endif
 
+#ifndef BCN_TIMEOUT_IN_SUSPEND
+#define BCN_TIMEOUT_IN_SUSPEND			6 /* bcn timeout value in suspend mode */
+#endif
+
 #ifndef CUSTOM_RXF_PRIO_SETTING
 #define CUSTOM_RXF_PRIO_SETTING		MAX((CUSTOM_DPC_PRIO_SETTING - 1), 1)
 #endif
@@ -965,6 +986,10 @@ extern uint dhd_force_tx_queueing;
 #ifndef MAX_DTIM_ALLOWED_INTERVAL
 #define MAX_DTIM_ALLOWED_INTERVAL 900 /* max allowed total beacon interval for DTIM skip */
 #endif
+#ifndef MIN_DTIM_FOR_ROAM_THRES_EXTEND
+#define MIN_DTIM_FOR_ROAM_THRES_EXTEND 600 /* minimum dtim interval to extend roam threshold */
+#endif
+
 #define NO_DTIM_SKIP 1
 #ifdef SDTEST
 /* Echo packet generator (SDIO), pkts/s */
